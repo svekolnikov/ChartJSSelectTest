@@ -1,0 +1,290 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+
+<h2>Selected dots: <span class="badge badge-secondary" id="counterBadge">0</span></h2>
+
+<div class="my-3" style="flex: auto; max-width: 970px; justify-content: center; margin: auto;">
+    <div style="max-height: 600px;">
+        <canvas id="xyChart"></canvas>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-4">
+        <button class="btn btn-block btn-outline-warning m-3" onclick="Random()">Random</button>
+    </div>
+    <div class="col-4">
+        <button class="btn btn-block btn-outline-danger m-3" onclick="ResetSelections()">Reset</button>
+    </div>
+    <div class="col-4">
+        <button class="btn btn-block btn-outline-success m-3" onclick="SendSelectedToServer()">Save</button>
+    </div>
+</div>
+
+
+@section Scripts{
+    <script>
+
+        let dataScatter = [];
+        let dataLine = [];
+        let dataBar = [];
+        let labels = [];
+
+        let scatterColor = '#6495ED';
+        let selectColor = '#fc2803';
+
+        let countSelected = 0;
+        let tosend = [];
+
+        var dataSetScatter = {
+            label: 'Scatter',
+            data: dataScatter,
+            type: 'scatter',
+            yAxisID: 'A',
+            backgroundColor: scatterColor,
+            pointBackgroundColor: [],
+            pointBorderColor: [],
+            order: 2
+        };
+        var dataSetLine = {
+            label: 'Line',
+            data: dataLine,
+            type: 'line',
+            yAxisID: 'A',
+            borderColor: '#e69dfa',
+            fill: false,
+            order: 0
+        };
+        var dateSetBar = {
+            label: 'Bar',
+            data: dataBar,
+            type: 'bar',
+            yAxisID: 'B',
+            backgroundColor: [],
+            borderColor: [],
+            barPercentage: 0.8,
+            order: 1
+        };
+
+        var chartData = {
+            labels: labels,
+            datasets: [dataSetScatter, dataSetLine, dateSetBar]
+        };
+
+        var chartOptions = {
+            animation: {
+                duration: 100
+            },
+            plugins: {
+                boxselect: {
+                    callbacks: {
+                        afterSelect: updateAfterSelect
+                    }
+                }
+            },
+            responsive: true,
+            scales: {
+                xAxes: [ {
+                        display: true,
+                        type: 'time',
+                        time: {
+                            parser: 'MM/DD/YYYY HH:mm',
+                            tooltipFormat: 'll HH:mm',
+                            unit: 'day',
+                            unitStepSize: 1,
+                            displayFormats: {
+                                'day': 'DD/MM/YYYY'
+                            }
+                        },
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Дата и Время'
+                        }
+                    }
+                ],
+                yAxes: [
+                    {
+                        id: 'A',
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Потеря металла, мм'
+                        },
+                        type: 'linear',
+                        position: 'left'
+                    }, {
+                        id: 'B',
+                        scaleLabel: {
+                            display: true,
+                            labelString: 'Скорость коррозии, мм/год'
+                        },
+                        type: 'linear',
+                        position: 'right'
+                    }
+                ]
+            }
+        }
+
+        var xyChart = new Chart(document.getElementById('xyChart').getContext('2d'),
+            {
+                type: 'line',
+                data: chartData,
+                options: chartOptions
+            });
+
+        function updateAfterSelect(startX, endX, startY, endY, datasets) { //datasets:  scatter, line, bar
+            SetScatterColor(datasets[0].data);
+            xyChart.update();
+            CountSelected();
+        }
+
+        function Random() {
+
+            xyChart.data.datasets.forEach(dataset => {
+                dataset.data = [];
+            });
+
+            xyChart.data.labels = DaysFromTo(new Date('1/2/1970'), new Date('1/24/1970'));
+
+            dataScatter = [];
+            dataLine = [];
+            dataBar = [];
+
+            ResetScatterColor(xyChart.data.labels.length);
+
+            //data
+            var maxBarValue = 100;
+            var maxScatterValue = 100;
+            var maxLineValue = 100;
+            for (let i = 0; i < xyChart.data.labels.length; i++) {
+                dataScatter.push({
+                    x: xyChart.data.labels[i],
+                    y: getRandomInt(maxScatterValue)
+                });
+                dataLine.push(getRandomInt(maxLineValue));
+                dataBar.push(getRandomInt(maxBarValue));
+            }
+
+            xyChart.data.datasets[0].data = dataScatter;
+            xyChart.data.datasets[1].data = dataLine;
+            xyChart.data.datasets[2].data = dataBar;
+
+            xyChart.data.datasets[2].backgroundColor = [];
+            xyChart.data.datasets[2].borderColor = [];
+            for (var i = 0; i < xyChart.data.datasets[2].data.length; i++) {
+                xyChart.data.datasets[2].backgroundColor.push(BarColorConverter(xyChart.data.datasets[2].data[i], 0, maxBarValue));
+                xyChart.data.datasets[2].borderColor.push(BarColorConverter(xyChart.data.datasets[2].data[i], 0, maxBarValue));
+            }
+
+            xyChart.update();
+        }
+
+        var percentColors = [
+            { pct: 0.0, color: { r: 0x00, g: 0xff, b: 0 } },
+            { pct: 0.5, color: { r: 0xff, g: 0xff, b: 0 } },
+            { pct: 1.0, color: { r: 0xff, g: 0x00, b: 0 } }];
+
+        function BarColorConverter(value, min, max) {
+            var pct = value / max;
+
+            for (var i = 1; i < percentColors.length - 1; i++) {
+                if (pct < percentColors[i].pct) {
+                    break;
+                }
+            }
+            var lower = percentColors[i - 1];
+            var upper = percentColors[i];
+            var range = upper.pct - lower.pct;
+            var rangePct = (pct - lower.pct) / range;
+            var pctLower = 1 - rangePct;
+            var pctUpper = rangePct;
+            var color = {
+                r: Math.floor(lower.color.r * pctLower + upper.color.r * pctUpper),
+                g: Math.floor(lower.color.g * pctLower + upper.color.g * pctUpper),
+                b: Math.floor(lower.color.b * pctLower + upper.color.b * pctUpper)
+            };
+            return 'rgb(' + [color.r, color.g, color.b].join(',') + ', 0.4)';
+
+            //return 'rgba(255, 99, 132, 0.2)';
+        }
+
+
+        function CountSelected() {
+            tosend = [];
+            for (var i = 0; i < xyChart.data.datasets[0].data.length; i++) {
+                if (xyChart.data.datasets[0].pointBackgroundColor[i] === selectColor) {
+                    tosend.push(xyChart.data.datasets[0].data[i]);
+                }
+            }
+            console.log(tosend.length);
+            document.getElementById('counterBadge').textContent = tosend.length;
+        }
+
+        function ResetSelections() {
+            ResetScatterColor(xyChart.data.labels.length);
+            xyChart.update();
+        }
+
+        function SendSelectedToServer() {
+            var jsonstr = JSON.stringify(tosend);
+            $.ajax({
+                url: '@Url.Action("SaveData")',
+                type: 'post',
+                data: jsonstr,
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                success: function(response) {
+                    if (response != null) {
+                        alert(response);
+                    }
+                },
+                error: function() {
+                    alert("Ошибка.");
+                }
+            });
+        }
+
+        function ResetScatterColor(count) {
+            xyChart.data.datasets[0].pointBackgroundColor = [];
+            xyChart.data.datasets[0].pointBorderColor = [];
+            for (var i = 0; i < count; i++) {
+                xyChart.data.datasets[0].pointBackgroundColor.push(scatterColor);
+                xyChart.data.datasets[0].pointBorderColor.push(scatterColor);
+            }
+            document.getElementById('counterBadge').textContent = '0';
+        }
+
+        function SetScatterColor(range) {
+            for (var i = 0; i < xyChart.data.datasets[0].data.length; i++) {
+                for (var j = 0; j < range.length; j++) {
+                    if (xyChart.data.datasets[0].data[i].x === range[j].x) {
+                        xyChart.data.datasets[0].pointBackgroundColor[i] = selectColor;
+                        xyChart.data.datasets[0].pointBorderColor[i] = selectColor;
+                    }
+                }
+            }
+        }
+
+        function DaysFromTo(startDate, endDate) {
+            var dates = [];
+
+            var currDate = moment(startDate).startOf('day');
+            var lastDate = moment(endDate).startOf('day');
+
+            while(currDate.add(1, 'days').diff(lastDate) < 0) {
+                dates.push(currDate.clone().toDate());
+            }
+
+            return dates;
+        };
+
+        function getRandomInt(max) {
+            return Math.floor(Math.random() * max);
+        }
+
+        window.onload = function () {
+            Random();
+        }
+
+    </script>
+}
