@@ -11,14 +11,17 @@
 </div>
 
 <div class="row">
-    <div class="col-4">
+    <div class="col-3">
         <button class="btn btn-block btn-outline-warning m-3" onclick="Random()">Random</button>
     </div>
-    <div class="col-4">
-        <button class="btn btn-block btn-outline-danger m-3" onclick="ResetSelections()">Reset</button>
+    <div class="col-3">
+        <button class="btn btn-block btn-outline-danger m-3" onclick="ResetSelections()">Reset selected</button>
     </div>
-    <div class="col-4">
-        <button class="btn btn-block btn-outline-success m-3" onclick="SendSelectedToServer()">Save</button>
+    <div class="col-3">
+        <button class="btn btn-block btn-outline-primary m-3" onclick="SendSelectedToServer()">Save selected</button>
+    </div>
+    <div class="col-3">
+        <button class="btn btn-block btn-outline-success m-3" onclick="SendImgToServer()">Save image</button>
     </div>
 </div>
 
@@ -232,7 +235,6 @@
             //return 'rgba(255, 99, 132, 0.2)';
         }
 
-
         function CountSelected() {
             tosend = [];
             for (var i = 0; i < xyChart.data.datasets[0].data.length; i++) {
@@ -253,6 +255,28 @@
             var jsonstr = JSON.stringify(tosend);
             $.ajax({
                 url: '@Url.Action("SaveData")',
+                type: 'post',
+                data: jsonstr,
+                contentType: "application/json; charset=utf-8",
+                dataType: "json",
+                success: function(response) {
+                    if (response != null) {
+                        alert(response);
+                    }
+                },
+                error: function() {
+                    alert("Ошибка.");
+                }
+            });
+        }
+
+        function SendImgToServer() {
+            //alert('Image saved.');
+            var img = xyChart.toBase64Image();
+            console.log(img);
+            var jsonstr = JSON.stringify(img);
+            $.ajax({
+                url: '@Url.Action("SaveImg")',
                 type: 'post',
                 data: jsonstr,
                 contentType: "application/json; charset=utf-8",
